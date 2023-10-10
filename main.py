@@ -11,6 +11,7 @@ from pmsa003 import PMSA_read
 import datalog_lib as dlog
 from info import *
 import usocket as socket
+import ssl
 import network
 
 #convierte de tupla de datos de fecha a cadena
@@ -34,15 +35,18 @@ def config():
     #configuración I2C
     i2c = I2C(0, scl=Pin(22, Pin.OPEN_DRAIN, Pin.PULL_UP),
               sda=Pin(21, Pin.OPEN_DRAIN, Pin.PULL_UP), freq=100000)
-    print(i2c.scan() )
+    print('i2c:', i2c.scan() )
     rtc = RTC()
     return i2c, rtc
 
 def update_RTC(rtc):
     wlan = dlog.wlan_connect(ssid, password)
+    if wlan == None:
+        return None
     print(wlan.ifconfig())
     dlog.get_date_NTP(['1.mx.pool.ntp.org', 'cronos.cenam.mx'])
     wlan.active(False)
+    return True
 
 
 def mide(i2c):
@@ -71,36 +75,57 @@ def save(data):
     pass
 
 def send(data, wlan):
-    timeout_send = 1.0
+    timeout_send = 4.0
     #url de API
-    url_server= "https://ruoa.unam.mx:8050/pm_api"
+    url_server= "https://ruoa.unam.mx:8041/pm_api"
     #separa url, asume que incluye puerto y protocolo
     protoc, _, host = url_server.split('/',2)
     print(protoc, host)
     host, port = host.split(':')
-    print(host, port)
+    print('host:',host, port)
+    wlan = dlog.wlan_connect(ssid, password)
     addr2 = socket.getaddrinfo(host, port)[0][-1]
+    #addr2 = ('132.248.8.29', 8041)
     print('addr:', addr2)
 
     if wlan.isconnected() == False:
         wlan = dlog.wlan_connect(ssid, password)
     if wlan != None:
+        print('conectado a', ssid)
         print('Enviando datos instantaneos a', host, data)
+        #sock_send = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock_send = socket.socket()
+        test = socket.getaddrinfo("www.google.com", 443)[0][-1]
+        print("test:", test)
         sock_send.settimeout(timeout_send)
+        #sock_send.connect(test)
+        #sock_send = ssl.wrap_socket(sock_send)
+        #sock_send.write(b"GET / HTTP/1.1\r\nHost: google.com\r\n\r\n")
+        #response = sock_send.read(200)
+        #print('he:', response)
+        #sock_send.close()
         try:
             sock_send.connect(addr2)
             print('connect')
-            sock_send.send(bytes('PUT /insta HTTP/1.1\r\n', 'utf8'))
-            sock_send.send(bytes('Content-Length: %s\r\n' % (len(data)+1), 'utf8'))
-            sock_send.send(bytes('Content-Type: text/csv\r\n\r\n', 'utf8'))
-            sock_send.send(data)
-            response = sock_send.recv(200)
+            sock_send = ssl.wrap_socket(sock_send)
+            sock_send.write(bytes('PUT /pm_api HTTP/1.1\r\n', 'utf8'))
+            sock_send.write(bytes('Content-Length: %s\r\n' % (len(data)), 'utf8'))
+            sock_send.write(bytes('Content-Type: text/csv\r\n\r\n', 'utf8'))
+            sock_send.write(bytes(data, 'utf8'))
+            print('send:', data)
+            #sock_send.send(bytes('\r\n', 'utf8'))
+            line =b''
+            response=b''
+            while line != b'0\r\n':
+                line = sock_send.readline()
+                print('line:', line)
+                response+=line
+            #response = sock_send.read(165)
             sock_send.close()
-            if response.split()[1] == b'201':
-                print('datos instantáneos recibidos')
-            else:
-                print(response)
+            if response!=b'':
+                if response.split()[1] == b'201':
+                    print('datos instantáneos recibidos')
+            print('response:', response)
         except OSError:
             print ('No hay conexión con el servidor ', host)
     else:
@@ -123,7 +148,7 @@ utc= -6
 i2c, rtc = config()
 
 wlan = network.WLAN(network.STA_IF)
-send('test', wlan)
+#send('test', wlan)
 
 #banderas
 flags={}
@@ -145,10 +170,12 @@ while True:
     time_now = time()
     time_delta = time_now - time_delta
 
-    if time_RTC <= time_now:
-        time_RTC += ΔRTC
-        update_RTC(rtc)
-        print('RTC update:', time_now)
+    #if time_RTC <= time_now:
+        #if (update_RTC(rtc) == None):
+            #print('update RTC fail!')
+        #else:
+            #time_RTC += ΔRTC
+            #print('RTC update:', time_now)
 
     if time_mide <= time_now:
         time_mide += Δs
