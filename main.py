@@ -13,6 +13,8 @@ from info import *
 import usocket as socket
 import ssl
 import network
+import sps30
+import bme280
 
 #convierte de tupla de datos de fecha a cadena
 #recibe la tupla y la zona horaria
@@ -52,22 +54,25 @@ def update_RTC(rtc):
 def mide(i2c):
 
     #lectura de datos PMSA
-    data = PMSA_read(i2c)
+    #data = PMSA_read(i2c)
+    data = sps30.read_meas(i2c)
 
     #definición de datos a obtener
     #PM1, PM2.5, PM10
     list_data= [
-        'PM1.0_ugm3',
-        'PM2.5_ugm3',
-        'PM10_ugm3',
-        #'1.0um_0.1L',
-        #'2.5um_0.1L',
-        #'10um_0.1L',
+        "PM1.0_ugm3",
+        "PM2.5_ugm3",
+        "PM4.0_ugm3",
+        "PM10_ugm3",
         ]
     #extrayendo sólo datos de interés
     #y convirtiendo a cadena
     data_str = [ str(data[name]) for name in list_data ]
     data_str = ','.join(data_str)
+    sht_values = bme.values
+    data_str += ','+sht_values[0]
+    data_str += ','+sht_values[2]
+    data_str += ','+sht_values[1]
 
     return data_str
 
@@ -80,13 +85,14 @@ def send(data, wlan):
     url_server= "https://ruoa.unam.mx:8041/pm_api"
     #separa url, asume que incluye puerto y protocolo
     protoc, _, host = url_server.split('/',2)
-    print(protoc, host)
     host, port = host.split(':')
     print('host:',host, port)
     wlan = dlog.wlan_connect(ssid, password)
+    if wlan == None:
+        print('No hay red!')
+        return None
     addr2 = socket.getaddrinfo(host, port)[0][-1]
     #addr2 = ('132.248.8.29', 8041)
-    print('addr:', addr2)
 
     if wlan.isconnected() == False:
         wlan = dlog.wlan_connect(ssid, password)
@@ -94,17 +100,9 @@ def send(data, wlan):
         print('conectado a', ssid)
         print('Enviando datos instantaneos a', host, data)
         #sock_send = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock_send = socket.socket()
-        test = socket.getaddrinfo("www.google.com", 443)[0][-1]
-        print("test:", test)
-        sock_send.settimeout(timeout_send)
-        #sock_send.connect(test)
-        #sock_send = ssl.wrap_socket(sock_send)
-        #sock_send.write(b"GET / HTTP/1.1\r\nHost: google.com\r\n\r\n")
-        #response = sock_send.read(200)
-        #print('he:', response)
-        #sock_send.close()
         try:
+            sock_send = socket.socket()
+            sock_send.settimeout(timeout_send)
             sock_send.connect(addr2)
             print('connect')
             sock_send = ssl.wrap_socket(sock_send)
@@ -127,9 +125,12 @@ def send(data, wlan):
                     print('datos instantáneos recibidos')
             print('response:', response)
         except OSError:
-            print ('No hay conexión con el servidor ', host)
+            print ('Error en la conexión con el servidor ', host)
+            if sock_send:
+                sock_send.close()
+                print('socket cerrado')
     else:
-        print('No se pido conectar a WiFi')
+        print('No se pudo conectar a WiFi')
     wlan.active(False)
 
 #definición de zona horaria
@@ -145,7 +146,13 @@ utc= -6
 # intervalo de actualización de RTC
 ΔRTC = 60*60*1
 
+#ID
+#ID = "pmpembu20230001"
+
 i2c, rtc = config()
+
+sps30.start(i2c)
+bme = bme280.BME280(i2c=i2c)
 
 wlan = network.WLAN(network.STA_IF)
 #send('test', wlan)
@@ -170,12 +177,12 @@ while True:
     time_now = time()
     time_delta = time_now - time_delta
 
-    #if time_RTC <= time_now:
-        #if (update_RTC(rtc) == None):
-            #print('update RTC fail!')
-        #else:
-            #time_RTC += ΔRTC
-            #print('RTC update:', time_now)
+    if time_RTC <= time_now:
+        if (update_RTC(rtc) == None):
+            print('update RTC fail!')
+        else:
+            time_RTC += ΔRTC
+            print('RTC update:', time_now)
 
     if time_mide <= time_now:
         time_mide += Δs
@@ -183,7 +190,7 @@ while True:
         date = rtc.datetime()
         #conversión de fecha
         date_str = format_date(date, utc=-6)
-        data_str = date_str +','+ mide(i2c)
+        data_str = ID + "," + date_str +','+ mide(i2c)
         print(data_str)
         save(data_str)
         send(data_str, wlan)
