@@ -5,7 +5,7 @@ requiere la bibliotea PMSA_read
 autor: Miguel Robles
 '''
 
-from machine import Pin, I2C, RTC
+from machine import Pin, I2C, RTC, SDCard, WDT
 from time import sleep, time
 from pmsa003 import PMSA_read
 import datalog_lib as dlog
@@ -15,6 +15,7 @@ import ssl
 import network
 import sps30
 import bme280
+import os
 
 #convierte de tupla de datos de fecha a cadena
 #recibe la tupla y la zona horaria
@@ -39,7 +40,8 @@ def config():
               sda=Pin(21, Pin.OPEN_DRAIN, Pin.PULL_UP), freq=100000)
     print('i2c:', i2c.scan() )
     rtc = RTC()
-    return i2c, rtc
+    sd = SDCard( slot =2, freq =1000000)
+    return i2c, rtc, sd
 
 def update_RTC(rtc):
     wlan = dlog.wlan_connect(ssid, password)
@@ -76,8 +78,14 @@ def mide(i2c):
 
     return data_str
 
-def save(data):
-    pass
+def save(data, sd, file_save, path_SD= "/sd"):
+    if dlog.check_SD(sd, path_SD) == True:
+        path_save  = path_SD +'/' +file_save
+        with open(path_save, 'a') as file:
+            file.write(data_str +'\n')
+        os.umount( path_SD )
+    else:
+        print("No hay memoria SD")
 
 def send(data, wlan):
     timeout_send = 4.0
@@ -143,13 +151,17 @@ utc= -6
 # intervalo de verificación
 Δt = Δs//5
 
+# WDT
+ΔWDT = Δt*2*1000
+wdt = WDT(timeout=ΔWDT )
+
 # intervalo de actualización de RTC
 ΔRTC = 60*60*1
 
 #ID
 #ID = "pmpembu20230001"
 
-i2c, rtc = config()
+i2c, rtc, sd = config()
 
 sps30.start(i2c)
 bme = bme280.BME280(i2c=i2c)
@@ -190,11 +202,13 @@ while True:
         date = rtc.datetime()
         #conversión de fecha
         date_str = format_date(date, utc=-6)
+        filename = ID + '_' + date_str[:10]+'.csv'
         data_str = ID + "," + date_str +','+ mide(i2c)
-        print(data_str)
-        save(data_str)
+        print(filename, data_str, )
+        save(data_str, sd, filename)
         send(data_str, wlan)
 
     if flags['send'] == True:
         send(data)
+    wdt.feed()
     sleep(Δt)
