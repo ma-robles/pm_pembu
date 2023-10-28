@@ -5,7 +5,7 @@ requiere la bibliotea PMSA_read
 autor: Miguel Robles
 '''
 
-from machine import Pin, I2C, RTC, SDCard, WDT
+from machine import Pin, I2C, RTC, SDCard, WDT, reset_cause 
 from time import sleep, time
 from pmsa003 import PMSA_read
 import datalog_lib as dlog
@@ -149,10 +149,15 @@ utc= -6
 Δs = 60
 
 # intervalo de verificación
-Δt = Δs//5
+Δt = Δs//6
+
+#check reset cause
+start_type = reset_cause()
+print('reset cause:', start_type)
+sleep(Δs)
 
 # WDT
-ΔWDT = Δt*2*1000
+ΔWDT = Δt*3*1000
 wdt = WDT(timeout=ΔWDT )
 
 # intervalo de actualización de RTC
