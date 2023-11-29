@@ -6,7 +6,7 @@ autor: Miguel Robles
 '''
 
 from machine import Pin, I2C, RTC, SDCard, WDT, reset_cause 
-from time import sleep, time
+from time import sleep, time, sleep_ms, ticks_ms, ticks_diff
 from pmsa003 import PMSA_read
 import datalog_lib as dlog
 from info import *
@@ -154,10 +154,10 @@ utc= -6
 #check reset cause
 start_type = reset_cause()
 print('reset cause:', start_type)
-sleep(Δs)
 
 # WDT
 ΔWDT = Δt*3*1000
+ΔWDT = 70*1000
 wdt = WDT(timeout=ΔWDT )
 
 # intervalo de actualización de RTC
@@ -190,9 +190,8 @@ time_mide = time_now
 time_RTC = time_now
 
 while True:
-    time_delta = time_now
     time_now = time()
-    time_delta = time_now - time_delta
+    start = ticks_ms()
 
     if time_RTC <= time_now:
         if (update_RTC(rtc) == None):
@@ -216,4 +215,6 @@ while True:
     if flags['send'] == True:
         send(data)
     wdt.feed()
-    sleep(Δt)
+    delta = 60000- ticks_diff(ticks_ms(), start)
+    print('delta:', delta)
+    sleep_ms(delta)
