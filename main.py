@@ -145,6 +145,8 @@ def send(data, wlan):
 #definición de zona horaria
 #utc= -6
 
+print('ID:' , ID)
+
 # definición de intervalos en [segundos]
 # intervalo de medición y  almacenamiento
 Δs = 60
