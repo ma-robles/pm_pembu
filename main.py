@@ -84,6 +84,7 @@ def save(data, sd, file_save, path_SD= "/sd"):
         with open(path_save, 'a') as file:
             file.write(data_str +'\n')
         os.umount( path_SD )
+        print("Datos almacenados en SD")
     else:
         print("No hay memoria SD")
 
