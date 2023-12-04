@@ -143,7 +143,7 @@ def send(data, wlan):
     wlan.active(False)
 
 #definición de zona horaria
-utc= -6
+#utc= -6
 
 # definición de intervalos en [segundos]
 # intervalo de medición y  almacenamiento
