@@ -143,28 +143,21 @@ def send(data, wlan):
 
 #definición de zona horaria
 utc= -6
-# definición de intervalos en [segundos]
 
+# definición de intervalos en [segundos]
 # intervalo de medición y  almacenamiento
 Δs = 60
-
-# intervalo de verificación
-Δt = Δs//6
 
 #check reset cause
 start_type = reset_cause()
 print('reset cause:', start_type)
 
 # WDT
-ΔWDT = Δt*3*1000
-ΔWDT = 70*1000
+ΔWDT = 600*1000
 wdt = WDT(timeout=ΔWDT )
 
 # intervalo de actualización de RTC
 ΔRTC = 60*60*1
-
-#ID
-#ID = "pmpembu20230001"
 
 i2c, rtc, sd = config()
 
@@ -172,7 +165,6 @@ sps30.start(i2c)
 bme = bme280.BME280(i2c=i2c)
 
 wlan = network.WLAN(network.STA_IF)
-#send('test', wlan)
 
 #banderas
 flags={}
@@ -188,6 +180,13 @@ time_mide = time_now
 
 #tiempo de siguiente update RTC
 time_RTC = time_now
+
+#check SD
+if dlog.check_SD(sd, '/sd') == True:
+    os.umount('/sd')
+    print("SD encontrada")
+else:
+    print("!!!No hay SD¡¡¡")
 
 while True:
     time_now = time()
@@ -205,7 +204,7 @@ while True:
         #lectura de fecha
         date = rtc.datetime()
         #conversión de fecha
-        date_str = format_date(date, utc=-6)
+        date_str = format_date(date, utc= utc)
         filename = ID + '_' + date_str[:10]+'.csv'
         data_str = ID + "," + date_str +','+ mide(i2c)
         print(filename, data_str, )
