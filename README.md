@@ -1,6 +1,8 @@
 # Material particulado PEMBU
 Proyecto de desarrollo de sensores de bajo costo de medición de material particulado de la red PEMBU
 
+Se deben copiar todos los archivos .py a la ESP32 para la correcta ejecución del programa.
+
 # Configuración
 
 El archivo info.py debe contener los datos de una red WiFi, ID de estación y zona horaria.
