@@ -12,3 +12,5 @@ echo "info" &&
 ampy -p $1 put info.py &&
 echo "pmsa" &&
 ampy -p $1 put pmsa003.py
+echo "ds3231" &&
+ampy -p $1 put ds3231.py

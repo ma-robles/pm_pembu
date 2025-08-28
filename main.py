@@ -4,9 +4,22 @@ requiere la bibliotea PMSA_read
 
 autor: Miguel Robles
 '''
-
-from machine import Pin, I2C, RTC, SDCard, WDT, reset_cause 
 from time import sleep, time, sleep_ms, ticks_ms, ticks_diff
+from machine import Pin
+led = Pin(15, Pin.OUT)
+led.on()
+print('Iniciando...')
+print('presione ctrl+c para detener el programa')
+#tiempo de arranque
+tup = 30
+for i in range(tup):
+    led.on()
+    print('*'*(tup-i))
+    sleep(0.5)
+    led.off()
+    sleep(0.5)
+    
+from machine import I2C, RTC, SDCard, WDT, reset_cause 
 from pmsa003 import PMSA_read
 import datalog_lib as dlog
 from info import *
@@ -16,6 +29,7 @@ import network
 import sps30
 import bme280
 import os
+import ds3231
 
 #convierte de tupla de datos de fecha a cadena
 #recibe la tupla y la zona horaria
@@ -46,9 +60,19 @@ def config():
 def update_RTC(rtc):
     wlan = dlog.wlan_connect(ssid, password)
     if wlan == None:
+        YY, MM, DD,wday, hh, mm, ss, _ = ds3231.get_time(i2c)
+        rtc.datetime( (YY, MM, DD, wday, hh, mm, ss, 0))
+        print('No hay NTP, Reloj:', rtc.datetime())
         return None
     print(wlan.ifconfig())
-    dlog.get_date_NTP(['1.mx.pool.ntp.org', 'cronos.cenam.mx'])
+    if dlog.get_date_NTP(['1.mx.pool.ntp.org', 'cronos.cenam.mx']) == True:
+        ds3231.set_time(i2c)
+        print('Reloj actualizado:', ds3231.get_time(i2c))
+    else:
+        YY, MM, DD,wday, hh, mm, ss, _ = ds3231.get_time(i2c)
+        rtc.datetime( (YY, MM, DD, wday, hh, mm, ss, 0))
+        print('No hay NTP, Reloj:', rtc.datetime())
+
     wlan.active(False)
     return True
 
@@ -163,6 +187,7 @@ wdt = WDT(timeout=ΔWDT )
 ΔRTC = 60*60*1
 
 i2c, rtc, sd = config()
+update_RTC(rtc)
 
 sps30.start(i2c)
 bme = bme280.BME280(i2c=i2c)
@@ -192,6 +217,7 @@ else:
     print("!!!No hay SD¡¡¡")
 
 while True:
+    led.on()
     time_now = time()
     start = ticks_ms()
 
@@ -219,4 +245,5 @@ while True:
     wdt.feed()
     delta = 60000- ticks_diff(ticks_ms(), start)
     print('delta:', delta)
+    led.off()
     sleep_ms(delta)
